@@ -27,7 +27,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 
@@ -242,6 +242,14 @@ class TTSBackend(ABC):
     #: that don't set it still ignore the kwargs (every generate() takes **kw),
     #: so this is a discoverability hint, not an enforcement gate.
     supports_emotion: bool = False
+
+    #: How ``instruct`` is read (#2389): ``"tags"`` for OmniVoice's closed
+    #: voice-design vocabulary, which rejects anything else, or ``"freeform"``
+    #: for engines that take a written description as-is (Qwen3-TTS
+    #: VoiceDesign, VoxCPM2, audio.cpp) or ignore it. Surfaced via
+    #: ``list_backends()`` so clients reduce prose to tags only where the
+    #: engine requires it.
+    instruct_vocabulary: Literal["tags", "freeform"] = "freeform"
 
     def ensure_ready(self) -> None:
         """Load model weights now (blocking), so callers can separate the
@@ -1412,6 +1420,7 @@ class OmniVoiceBackend(TTSBackend):
 
     id = "omnivoice"
     display_name = "VoiceStudio (k2-fsa/OmniVoice, 600+ languages)"
+    instruct_vocabulary = "tags"
     gpu_compat = ("cuda", "rocm", "mps", "cpu")
     # Derived from the pool's own per-job budget (_GPU_VRAM_PER_JOB_GB = 5.0 in
     # model_manager, itself measured from the ~1.6 GB forward + autoregressive
@@ -3297,6 +3306,7 @@ def list_backends(*, include_hidden: bool = False) -> list[dict]:
           "gpu_compat":     list[str],              # subset of {cuda, rocm, mps, vulkan, xpu, npu, cpu}
           "supports_cloning": Optional[bool],       # True/False from the class attr; None when
                                                     #   model-dependent (property, e.g. mlx-audio)
+          "instruct_vocabulary": "tags" | "freeform",  # OmniVoice tag set vs model-native text
           "max_ref_seconds": Optional[float],       # seconds of a clone clip the engine uses
           "ref_strategy": Optional[str],            # "best_window" | "head" | "full"; None = unverified
           "effective_device": str,                  # device this engine uses on THIS host
@@ -3420,6 +3430,9 @@ def list_backends(*, include_hidden: bool = False) -> list[dict]:
             # Graded-emotion capability (#1208) — drives the Audiobook emotion
             # panel's engine gate. Class attr, defaults False.
             "supports_emotion": bool(getattr(cls, "supports_emotion", False)),
+            # "tags" = OmniVoice's closed design vocabulary; "freeform" = the
+            # text reaches the model as written (#2389).
+            "instruct_vocabulary": getattr(cls, "instruct_vocabulary", "freeform"),
             # Reference-length truth (#2281): how much of a clone clip the
             # engine really uses and how it picks it. None = not verified.
             "max_ref_seconds": getattr(cls, "max_ref_seconds", None),

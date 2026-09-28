@@ -555,12 +555,7 @@ def _engine_instructions(backend, instructions: Optional[str]) -> Optional[str]:
     """
     if not instructions:
         return None
-    from services.tts_backend import OmniVoiceBackend
-    if (
-        isinstance(backend, OmniVoiceBackend)
-        or getattr(backend, "supports_native_omnivoice_controls", False)
-        or str(getattr(backend, "id", "")).startswith("omnivoice")
-    ):
+    if getattr(backend, "instruct_vocabulary", "freeform") == "tags":
         from omnivoice.utils.voice_design import sanitize_instruct
         return sanitize_instruct(instructions) or None
     return instructions
