@@ -9,7 +9,8 @@ Four layers:
     idempotent on a fresh install, downgrades cleanly and converges with
     ``_BASE_SCHEMA``; a DB where alembic cannot run heals via ``ensure_schema``.
   * ``_design_recipe_json`` treats the form field as hostile: only a
-    well-formed, bounded recipe with known categories is stored, re-serialized.
+    well-formed, bounded recipe with known categories is stored, re-serialized,
+    and the mapped details are always derived from the description itself.
   * ``POST /generate`` stores the recipe with the take and ``GET /history``
     returns it; a malformed recipe never fails the take.
 """
@@ -26,11 +27,12 @@ os.environ.setdefault("OMNIVOICE_MODEL", "test")
 os.environ.setdefault("OMNIVOICE_DISABLE_FILE_LOG", "1")
 
 _PREVIOUS = "0012_call_sessions"
-_RECIPE = {
-    "description": "raspy old woman, scottish accent",
-    "picks": {"Pitch": "low pitch"},
-    "mapped": {"Gender": "female", "Age": "elderly"},
-}
+_SENT = {"description": "raspy old woman, scottish accent", "picks": {"Pitch": "low pitch"}}
+
+
+def _stored(sent=_SENT):
+    parse = importlib.import_module("core.describe_voice").parse_description
+    return {**sent, "mapped": parse(sent["description"])["attrs"]}
 
 # generation_history as every DB before this change has it.
 _PRE_RECIPE_HISTORY = """
@@ -152,8 +154,17 @@ def _recipe_json():
 
 
 def test_valid_recipe_is_stored_re_serialized():
-    raw = json.dumps({**_RECIPE, "extra": "ignored"})
-    assert json.loads(_recipe_json()(raw)) == _RECIPE
+    raw = json.dumps({**_SENT, "extra": "ignored"})
+    stored = json.loads(_recipe_json()(raw))
+    assert stored == _stored()
+    assert stored["mapped"]["Gender"] == "female" and stored["mapped"]["Age"] == "elderly"
+
+
+def test_mapped_details_come_from_the_description_not_the_client():
+    """A take rendered before the page's mapping landed still records details
+    that match the description it was rendered from."""
+    stale = {**_SENT, "mapped": {"Gender": "male", "Age": "child"}}
+    assert json.loads(_recipe_json()(json.dumps(stale))) == _stored()
 
 
 @pytest.mark.parametrize(
@@ -163,12 +174,13 @@ def test_valid_recipe_is_stored_re_serialized():
         "",
         "not json",
         "[]",
-        json.dumps({**_RECIPE, "description": 7}),
-        json.dumps({**_RECIPE, "description": "x" * 2001}),
-        json.dumps({**_RECIPE, "picks": ["low pitch"]}),
-        json.dumps({**_RECIPE, "picks": {"Timbre": "warm"}}),
-        json.dumps({**_RECIPE, "mapped": {"Gender": 1}}),
-        json.dumps({**_RECIPE, "mapped": {"Gender": "x" * 65}}),
+        json.dumps({**_SENT, "description": 7}),
+        json.dumps({**_SENT, "description": "x" * 2001}),
+        json.dumps({"picks": {}}),
+        json.dumps({**_SENT, "picks": ["low pitch"]}),
+        json.dumps({**_SENT, "picks": {"Timbre": "warm"}}),
+        json.dumps({**_SENT, "picks": {"Gender": 1}}),
+        json.dumps({**_SENT, "picks": {"Gender": "x" * 65}}),
         "{" + " " * 9000 + "}",
     ],
 )
@@ -233,7 +245,7 @@ def _take(client, engine, **extra):
 
 def test_generate_stores_the_recipe_with_the_take(client):
     http, engine = client
-    raw = json.dumps(_RECIPE)
+    raw = json.dumps(_SENT)
     res = http.post(
         "/generate",
         data={"text": "stored recipe", "engine": engine.id, "instruct": "raspy", "design_recipe": raw},
@@ -242,7 +254,7 @@ def test_generate_stores_the_recipe_with_the_take(client):
     take_id = res.headers["X-Audio-Id"]
     try:
         listed = {item["id"]: item for item in http.get("/history").json()}
-        assert json.loads(listed[take_id]["design_recipe"]) == _RECIPE
+        assert json.loads(listed[take_id]["design_recipe"]) == _stored()
     finally:
         with importlib.import_module("core.db").db_conn() as conn:
             conn.execute("DELETE FROM generation_history WHERE id=?", (take_id,))

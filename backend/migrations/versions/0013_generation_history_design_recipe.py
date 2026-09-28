@@ -5,7 +5,8 @@ Revises: 0012_call_sessions
 Create Date: 2026-09-28 00:00:00.000000
 
 Adds ``generation_history.design_recipe TEXT DEFAULT NULL`` — the Voice Design
-draft behind a take, as JSON ``{"description", "picks", "mapped"}`` (#2389).
+draft behind a take, as JSON ``{"description", "picks", "mapped"}`` (#2389),
+where ``mapped`` is derived server-side from the description.
 The instruct alone cannot say which details the user wrote, picked or had
 mapped from the description, so reopening a take could not rebuild the draft
 that produced it. Rows written before this column stay NULL and keep the

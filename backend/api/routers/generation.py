@@ -211,17 +211,20 @@ def _design_recipe_json(raw: Optional[str]) -> Optional[str]:
     """Validated Voice Design draft to store with a take, or None (#2389).
 
     ``design_recipe`` is display metadata from the Design page: the description
-    as written, the user's explicit picks and the details the description maps
-    to. It never affects synthesis, so a malformed or oversized value is
-    dropped instead of failing the take. Only known categories and bounded
-    strings survive, and the stored JSON is re-serialized from the parsed
-    value — the raw form field is never persisted.
+    as written and the user's explicit picks. It never affects synthesis, so a
+    malformed or oversized value is dropped instead of failing the take. Only
+    known categories and bounded strings survive, and the stored JSON is
+    re-serialized from the parsed value — the raw form field is never
+    persisted. The details the description maps to are derived here with the
+    same mapper as ``/design/describe``, so they always match the description
+    this take was rendered from, even when the page's own mapping had not
+    landed yet.
     """
     if not raw or len(raw) > 4 * _DESIGN_DESCRIPTION_MAX:
         return None
     import json
 
-    from core.describe_voice import CATEGORY_ORDER
+    from core.describe_voice import CATEGORY_ORDER, parse_description
 
     try:
         value = json.loads(raw)
@@ -233,24 +236,17 @@ def _design_recipe_json(raw: Optional[str]) -> Optional[str]:
     if not isinstance(description, str) or len(description) > _DESIGN_DESCRIPTION_MAX:
         return None
 
-    def details(field):
-        items = value.get(field)
-        if not isinstance(items, dict):
-            return None
-        out = {}
-        for category, detail in items.items():
-            if (
-                category not in CATEGORY_ORDER
-                or not isinstance(detail, str)
-                or len(detail) > _DESIGN_DETAIL_MAX
-            ):
-                return None
-            out[category] = detail
-        return out
-
-    picks, mapped = details("picks"), details("mapped")
-    if picks is None or mapped is None:
+    picks = value.get("picks")
+    if not isinstance(picks, dict):
         return None
+    for category, detail in picks.items():
+        if (
+            category not in CATEGORY_ORDER
+            or not isinstance(detail, str)
+            or len(detail) > _DESIGN_DETAIL_MAX
+        ):
+            return None
+    mapped = parse_description(description)["attrs"]
     return json.dumps(
         {"description": description, "picks": picks, "mapped": mapped},
         ensure_ascii=False,
