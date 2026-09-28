@@ -203,6 +203,60 @@ async def _run_with_reference_lease(lease, factory):
             release()
 
 
+_DESIGN_DESCRIPTION_MAX = 2000  # the Voice Design description field's maxLength
+_DESIGN_DETAIL_MAX = 64
+
+
+def _design_recipe_json(raw: Optional[str]) -> Optional[str]:
+    """Validated Voice Design draft to store with a take, or None (#2389).
+
+    ``design_recipe`` is display metadata from the Design page: the description
+    as written, the user's explicit picks and the details the description maps
+    to. It never affects synthesis, so a malformed or oversized value is
+    dropped instead of failing the take. Only known categories and bounded
+    strings survive, and the stored JSON is re-serialized from the parsed
+    value — the raw form field is never persisted.
+    """
+    if not raw or len(raw) > 4 * _DESIGN_DESCRIPTION_MAX:
+        return None
+    import json
+
+    from core.describe_voice import CATEGORY_ORDER
+
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(value, dict):
+        return None
+    description = value.get("description")
+    if not isinstance(description, str) or len(description) > _DESIGN_DESCRIPTION_MAX:
+        return None
+
+    def details(field):
+        items = value.get(field)
+        if not isinstance(items, dict):
+            return None
+        out = {}
+        for category, detail in items.items():
+            if (
+                category not in CATEGORY_ORDER
+                or not isinstance(detail, str)
+                or len(detail) > _DESIGN_DETAIL_MAX
+            ):
+                return None
+            out[category] = detail
+        return out
+
+    picks, mapped = details("picks"), details("mapped")
+    if picks is None or mapped is None:
+        return None
+    return json.dumps(
+        {"description": description, "picks": picks, "mapped": mapped},
+        ensure_ascii=False,
+    )
+
+
 def _profile_instruct(row):
     """Validator-safe instruct for a stored profile row.
 
@@ -1302,7 +1356,7 @@ def _persist_profile_ref_text(profile_id: str, ref_text: str) -> None:
 async def _finalize_generation(
     audio_tensor, sample_rate, *, text, history_mode, ref_audio_path,
     language, instruct, resolved_profile_id, used_seed, start_time,
-    already_marked=False,
+    already_marked=False, design_recipe=None,
 ):
     """Shared tail of a successful generation: watermark → save WAV →
     history row (self-healing) → retention prune → event emit.
@@ -1352,10 +1406,10 @@ async def _finalize_generation(
     def _write_history():
         with db_conn() as conn:
             conn.execute(
-                "INSERT INTO generation_history (id, text, mode, language, instruct, profile_id, audio_path, duration_seconds, generation_time, seed, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO generation_history (id, text, mode, language, instruct, profile_id, audio_path, duration_seconds, generation_time, seed, design_recipe, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (audio_id, text[:200], history_mode or ("clone" if ref_audio_path else "design"),
                  language or "Auto", instruct or "", resolved_profile_id,
-                 audio_filename, audio_dur, gen_time, used_seed, time.time())
+                 audio_filename, audio_dur, gen_time, used_seed, design_recipe, time.time())
             )
     try:
         _write_history()
@@ -1562,6 +1616,9 @@ async def generate_speech(
     ref_audio: Optional[UploadFile] = File(None),
     ref_text: Optional[str] = Form(None),
     instruct: Optional[str] = Form(None),
+    # #2389: the Voice Design draft behind this take (description, picks,
+    # mapped details) so reopening it rebuilds the same draft. Metadata only.
+    design_recipe: Optional[str] = Form(None),
     duration: Optional[float] = Form(None),
     num_step: Optional[int] = Form(None),
     guidance_scale: float = Form(2.0),
@@ -1790,6 +1847,7 @@ async def generate_speech(
     # never sent, so a rejection can name the profile instead of the picker.
     language_from_profile = False
     history_mode = None  # profile.kind when a profile drives; else inferred at insert
+    stored_design_recipe = _design_recipe_json(design_recipe)
     # #1032: profile id to persist an auto-transcribed reference transcript to.
     # Set only for a plain (unlocked) clone profile whose stored ref_text is
     # empty — the case where every /generate re-ran a full ASR model load +
@@ -2109,6 +2167,7 @@ async def generate_speech(
                     ref_audio_path=ref_audio_path, language=language,
                     instruct=instruct, resolved_profile_id=resolved_profile_id,
                     used_seed=used_seed, start_time=start_time, already_marked=True,
+                    design_recipe=stored_design_recipe,
                 )
                 # #1330's dropped-chunk warning has no remote carrier yet: the
                 # gateway hands back audio, not the worker's render metadata.
@@ -2428,6 +2487,7 @@ async def generate_speech(
                     ref_audio_path=ref_audio_path, language=language,
                     instruct=instruct, resolved_profile_id=resolved_profile_id,
                     used_seed=used_seed, start_time=start_time,
+                    design_recipe=stored_design_recipe,
                 )
                 # #1330: before `done`, say what the take is missing. Its own
                 # frame rather than a `done` field so a consumer that only
@@ -2583,6 +2643,7 @@ async def generate_speech(
             ref_audio_path=ref_audio_path, language=language, instruct=instruct,
             resolved_profile_id=resolved_profile_id, used_seed=used_seed,
             start_time=start_time, already_marked=_already_marked,
+            design_recipe=stored_design_recipe,
         )
         audio_id = _meta["id"]
         audio_filename = _meta["filename"]
