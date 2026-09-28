@@ -126,11 +126,14 @@ export interface SystemInfo {
 
 export type InstructVocabulary = 'tags' | 'freeform';
 
-/** The Voice Design draft behind a take, stored with it so reopening rebuilds it. */
+/**
+ * The Voice Design draft sent with a take so reopening it rebuilds the draft.
+ * The stored recipe also carries `mapped`, which the backend derives from the
+ * description itself.
+ */
 export interface DesignRecipe {
   description: string;
   picks: Record<string, string>;
-  mapped: Record<string, string>;
 }
 
 // ── Generation (`POST /generate`, classic whole-file path) ─────────────────

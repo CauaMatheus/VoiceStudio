@@ -164,18 +164,19 @@ export function designInstruct(
   return [draft.description.trim(), tags].filter(Boolean).join(', ');
 }
 
-/** The part of the draft stored with a take so reopening it rebuilds the draft (#2389). */
+/** The part of the draft sent with a take so reopening it rebuilds the draft (#2389). */
 export function designRecipe(draft: DesignDraft): DesignRecipe {
   return {
     description: draft.description.trim(),
     picks: Object.fromEntries(
       Object.entries(draft.picks).map(([category, pick]) => [category, pick.value]),
     ),
-    mapped: draft.mapped,
   };
 }
 
-function parseRecipe(raw: string | null | undefined): DesignRecipe | null {
+function parseRecipe(
+  raw: string | null | undefined,
+): (DesignRecipe & { mapped: Record<string, string> }) | null {
   if (!raw) return null;
   try {
     const value = JSON.parse(raw);
@@ -183,6 +184,7 @@ function parseRecipe(raw: string | null | undefined): DesignRecipe | null {
     return {
       description: value.description,
       picks: stringRecord(value.picks),
+      // Derived by the backend from this description when the take was stored.
       mapped: stringRecord(value.mapped),
     };
   } catch {

@@ -189,10 +189,13 @@ describe('free-form design drafts (#2389)', () => {
       'raspy old woman',
     );
     const drafted = pickDetail(mapped, 'Pitch', 'low pitch').draft;
+    const sent = designRecipe(drafted);
+    expect(sent).toEqual({ description: 'raspy old woman', picks: { Pitch: 'low pitch' } });
+    // The backend stores the recipe with the mapping it derives from the description.
     const reopened = designDraftFromTake({
       ...take,
       instruct: designInstruct(drafted, 'freeform'),
-      design_recipe: JSON.stringify(designRecipe(drafted)),
+      design_recipe: JSON.stringify({ ...sent, mapped: drafted.mapped }),
     });
     expect(reopened).toMatchObject({
       description: 'raspy old woman',
