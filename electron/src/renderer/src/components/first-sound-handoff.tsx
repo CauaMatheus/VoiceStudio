@@ -34,6 +34,8 @@ export function FirstSoundHandoff() {
         attrs: mergeDescribedAttrs(instructToVdStates(defaults.instruct)),
         seed,
         profileId: null,
+        description: '',
+        describedAttrs: {},
       });
       await router.navigate({ to: '/design' });
       try {

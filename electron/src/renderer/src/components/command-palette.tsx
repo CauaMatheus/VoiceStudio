@@ -38,6 +38,7 @@ import {
 import {
   designDraftFromTake,
   readDraft,
+  replaceRecipe,
   restoreDesignProfile,
   writeDraft,
 } from '@/features/design/design-draft';
@@ -254,12 +255,13 @@ export function CommandPalette() {
         if (profile.kind === 'design') {
           const current = readDraft();
           const restored = restoreDesignProfile(profile, current.seed);
-          writeDraft({
-            ...current,
-            attrs: restored.attrs,
-            seed: restored.seed,
-            profileId: restored.profileId,
-          });
+          writeDraft(
+            replaceRecipe(current, {
+              attrs: restored.attrs,
+              seed: restored.seed,
+              profileId: restored.profileId,
+            }),
+          );
           patchCloneSettings({ language: restored.language });
           await navigate({ to: '/design' });
           return;

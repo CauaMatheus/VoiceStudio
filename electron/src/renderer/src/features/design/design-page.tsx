@@ -14,7 +14,9 @@ import {
   STORAGE,
   designInstruct,
   readDraft,
+  replaceRecipe,
   restoreDesignProfile,
+  withoutDescribedAttrs,
   type DesignDraft,
 } from './design-draft';
 import { useDescription } from './use-description';
@@ -65,14 +67,18 @@ export function DesignPage() {
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [productionOpen, setProductionOpen] = useState(false);
-  const [description, setDescription] = useState('');
   const [startingOpen, setStartingOpen] = useState(true);
-  const mapper = useDescription((attrs) =>
-    setDraft((current) => ({ ...current, attrs: mergeDescribedAttrs(attrs) })),
+  const mapper = useDescription((described) =>
+    setDraft((current) => {
+      const attrs = mergeDescribedAttrs(described);
+      return { ...current, attrs, describedAttrs: attrs };
+    }),
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const generation = useGenerateClone();
+  const freeform = generation.instructVocabulary === 'freeform';
+  const description = draft.description;
   const client = useQueryClient();
   const profiles = useProfiles();
   const savedProfilesRef = useRef<HTMLDetailsElement>(null);
@@ -89,6 +95,11 @@ export function DesignPage() {
   useEffect(() => {
     if (selectedTake) setProductionOpen(false);
   }, [selectedTake]);
+  useEffect(() => {
+    // Free-form engines read the description itself; details mapped from it
+    // in tag mode would only repeat or contradict it (#2389).
+    if (freeform) setDraft(withoutDescribedAttrs);
+  }, [freeform, draft.describedAttrs]);
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -158,7 +169,6 @@ export function DesignPage() {
     : t('clone.synthesize');
   const generationProgress =
     generation.stage === 'loading' ? generation.modelProgress : generation.progress;
-  const freeform = generation.instructVocabulary === 'freeform';
   const identityRecipe =
     Object.values(draft.attrs)
       .filter((value) => value && value !== 'Auto')
@@ -198,7 +208,11 @@ export function DesignPage() {
                       return;
                     }
                     mapper.cancel();
-                    setDraft((current) => ({ ...current, attrs: mergeDescribedAttrs({}) }));
+                    setDraft((current) => ({
+                      ...current,
+                      attrs: mergeDescribedAttrs({}),
+                      describedAttrs: {},
+                    }));
                   }}
                 >
                   <RotateCcwIcon />
@@ -214,7 +228,8 @@ export function DesignPage() {
               value={description}
               placeholder={t('clone.describe_placeholder')}
               onChange={(event) => {
-                setDescription(event.target.value);
+                const value = event.target.value;
+                setDraft((current) => ({ ...current, description: value }));
                 if (freeform) mapper.cancel();
                 else mapper.describe(event.target.value);
               }}
@@ -258,12 +273,13 @@ export function DesignPage() {
                     onClick={() => {
                       mapper.cancel();
                       const restored = restoreDesignProfile(profile, draft.seed);
-                      setDraft((current) => ({
-                        ...current,
-                        attrs: restored.attrs,
-                        seed: restored.seed,
-                        profileId: restored.profileId,
-                      }));
+                      setDraft((current) =>
+                        replaceRecipe(current, {
+                          attrs: restored.attrs,
+                          seed: restored.seed,
+                          profileId: restored.profileId,
+                        }),
+                      );
                       setCloneSetting('language', restored.language);
                     }}
                   >
@@ -315,10 +331,9 @@ export function DesignPage() {
                 attrs={draft.attrs}
                 onSelect={(attrs) => {
                   mapper.cancel();
-                  setDraft((current) => ({
-                    ...current,
-                    attrs: mergeDescribedAttrs(attrs),
-                  }));
+                  setDraft((current) =>
+                    replaceRecipe(current, { attrs: mergeDescribedAttrs(attrs) }),
+                  );
                 }}
               />
               <div className="flex flex-wrap gap-1">
@@ -330,10 +345,9 @@ export function DesignPage() {
                     disabled={generation.isGenerating}
                     onClick={() => {
                       mapper.cancel();
-                      setDraft((current) => ({
-                        ...current,
-                        attrs: mergeDescribedAttrs(preset.attrs),
-                      }));
+                      setDraft((current) =>
+                        replaceRecipe(current, { attrs: mergeDescribedAttrs(preset.attrs) }),
+                      );
                     }}
                   >
                     {t('clone.preset_' + preset.id)
@@ -480,11 +494,12 @@ export function DesignPage() {
               disabled={generation.isGenerating}
               onUse={(preset) => {
                 mapper.cancel();
-                setDraft((current) => ({
-                  ...current,
-                  text: preset.script || current.text,
-                  attrs: mergeDescribedAttrs(preset.attrs),
-                }));
+                setDraft((current) =>
+                  replaceRecipe(current, {
+                    text: preset.script || current.text,
+                    attrs: mergeDescribedAttrs(preset.attrs),
+                  }),
+                );
                 setCloneSetting('language', preset.language || 'Auto');
               }}
             />

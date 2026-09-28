@@ -14,7 +14,12 @@ import type { DubProject } from '@/features/projects/project-format';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { apiJson } from '@/lib/api/client';
-import { readDraft, restoreDesignProfile, writeDraft } from '@/features/design/design-draft';
+import {
+  readDraft,
+  replaceRecipe,
+  restoreDesignProfile,
+  writeDraft,
+} from '@/features/design/design-draft';
 import {
   ArrowRightIcon,
   AudioLinesIcon,
@@ -163,12 +168,13 @@ export function HomePage() {
     if (profile.kind === 'design') {
       const current = readDraft();
       const restored = restoreDesignProfile(profile, current.seed);
-      writeDraft({
-        ...current,
-        attrs: restored.attrs,
-        seed: restored.seed,
-        profileId: restored.profileId,
-      });
+      writeDraft(
+        replaceRecipe(current, {
+          attrs: restored.attrs,
+          seed: restored.seed,
+          profileId: restored.profileId,
+        }),
+      );
       patchCloneSettings({ language: restored.language });
       await navigate({ to: '/design' });
       return;

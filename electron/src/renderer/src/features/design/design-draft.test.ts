@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Profile } from '@/lib/api/types';
-import { designInstruct, readDraft, restoreDesignProfile, STORAGE } from './design-draft';
+import type { HistoryItem, Profile } from '@/lib/api/types';
+import {
+  designDraftFromTake,
+  designInstruct,
+  readDraft,
+  replaceRecipe,
+  restoreDesignProfile,
+  STORAGE,
+  withoutDescribedAttrs,
+} from './design-draft';
 
 const profile = {
   id: 'designed-voice',
@@ -61,5 +69,61 @@ describe('designInstruct', () => {
       'raspy old female, scottish accent, female, elderly',
     );
     expect(designInstruct(attrs, '  ', 'freeform')).toBe('female, elderly');
+  });
+});
+
+describe('free-form design drafts (#2389)', () => {
+  const take = {
+    id: 'take',
+    text: 'Hello',
+    mode: 'design',
+    language: null,
+    instruct: 'raspy old female, scottish accent',
+    profile_id: null,
+    audio_path: 'take.wav',
+    duration_seconds: 1,
+    generation_time: 1,
+    seed: 3,
+    starred: null,
+    created_at: 1,
+  } satisfies HistoryItem;
+
+  it('restores a free-form take as its description instead of its tags', () => {
+    expect(designDraftFromTake(take)).toMatchObject({
+      description: 'raspy old female, scottish accent',
+      attrs: { Gender: 'Auto', Age: 'Auto' },
+    });
+    expect(designDraftFromTake({ ...take, instruct: 'female, elderly' })).toMatchObject({
+      description: '',
+      attrs: { Gender: 'female', Age: 'elderly' },
+    });
+  });
+
+  it('drops the previous description when the recipe is replaced', () => {
+    const draft = { ...readDraft(), description: 'raspy', describedAttrs: { Gender: 'female' } };
+    expect(replaceRecipe(draft, { attrs: { Gender: 'male' } })).toMatchObject({
+      description: '',
+      describedAttrs: {},
+      attrs: { Gender: 'male' },
+    });
+  });
+
+  it('keeps explicit picks and drops details mapped from the description', () => {
+    const draft = {
+      ...readDraft(),
+      attrs: { ...readDraft().attrs, Gender: 'female', Age: 'elderly', Pitch: 'low pitch' },
+      describedAttrs: { Gender: 'female', Age: 'elderly', Pitch: 'Auto' },
+    };
+    expect(withoutDescribedAttrs(draft)).toMatchObject({
+      attrs: { Gender: 'Auto', Age: 'Auto', Pitch: 'low pitch' },
+      describedAttrs: {},
+    });
+    const clean = { ...draft, describedAttrs: {} };
+    expect(withoutDescribedAttrs(clean)).toBe(clean);
+  });
+
+  it('reads drafts saved before descriptions were persisted', () => {
+    localStorage.setItem(STORAGE, JSON.stringify({ text: 'Hi', describedAttrs: ['bad'] }));
+    expect(readDraft()).toMatchObject({ description: '', describedAttrs: {} });
   });
 });
