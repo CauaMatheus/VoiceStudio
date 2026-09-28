@@ -70,49 +70,53 @@ export function replaceRecipe(current: DesignDraft, recipe: Partial<DesignDraft>
   return { ...current, description: '', describedAttrs: {}, ...recipe };
 }
 
-/**
- * Drop the details the mapper derived from a description, keeping explicit
- * picks. Free-form engines read the description itself, so re-sending its
- * tag mapping would repeat or contradict it.
- */
-export function withoutDescribedAttrs(draft: DesignDraft): DesignDraft {
-  const described = Object.entries(draft.describedAttrs);
-  if (!described.length) return draft;
-  const attrs = { ...draft.attrs };
-  for (const [category, value] of described) {
-    if (attrs[category] === value) attrs[category] = 'Auto';
-  }
-  return { ...draft, attrs: mergeDescribedAttrs(attrs), describedAttrs: {} };
+/** A detail the user picks is theirs, even when it matches what the mapper chose. */
+export function claimDetail(
+  described: Record<string, string>,
+  category: string,
+): Record<string, string> {
+  const next = { ...described };
+  delete next[category];
+  return next;
 }
 
 /**
  * The instruct a design take sends. OmniVoice only accepts its tag set, so the
- * picked details are all it gets; free-form engines read the description as
- * written, with any picked details appended as extra cues (#2389).
+ * details are all it gets; free-form engines read the description as written,
+ * with only the details the user picked appended as extra cues (#2389). Details
+ * mapped from the description stay in the draft for OmniVoice but would only
+ * repeat or contradict the description here.
  */
 export function designInstruct(
-  attrs: Record<string, string>,
-  description: string,
+  draft: Pick<DesignDraft, 'attrs' | 'description' | 'describedAttrs'>,
   vocabulary: InstructVocabulary,
 ): string {
-  const tags = buildDesignInstruct(attrs, '').instruct;
-  if (vocabulary !== 'freeform') return tags;
-  return [description.trim(), tags].filter(Boolean).join(', ');
+  if (vocabulary !== 'freeform') return buildDesignInstruct(draft.attrs, '').instruct;
+  const picked = Object.fromEntries(
+    Object.entries(draft.attrs).map(([category, value]) => [
+      category,
+      draft.describedAttrs[category] === value ? 'Auto' : value,
+    ]),
+  );
+  const tags = buildDesignInstruct(picked, '').instruct;
+  return [draft.description.trim(), tags].filter(Boolean).join(', ');
 }
 
 /** Rebuild the Voice Design workspace from a generation-history recipe. */
 export function designDraftFromTake(item: HistoryItem): DesignDraft {
   const instruct = item.instruct ?? '';
+  const attrs = mergeDescribedAttrs(instructToVdStates(instruct));
   // A free-form take holds prose the tag set cannot express; rebuilding only
-  // its tags would silently change the voice on the next render.
+  // its tags would silently change the voice on the next render. Its tags are
+  // still restored, as details derived from the description, for OmniVoice.
   const freeform = sanitizeInstruct(instruct).unsupported.length > 0;
   return {
     text: item.text,
-    attrs: mergeDescribedAttrs(freeform ? {} : instructToVdStates(instruct)),
+    attrs,
     seed: item.seed ?? pickDesignSeed(false, null),
     profileId: item.profile_id,
     description: freeform ? instruct : '',
-    describedAttrs: {},
+    describedAttrs: freeform ? attrs : {},
   };
 }
 

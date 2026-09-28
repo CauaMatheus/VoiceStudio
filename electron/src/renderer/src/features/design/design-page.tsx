@@ -14,9 +14,9 @@ import {
   STORAGE,
   designInstruct,
   readDraft,
+  claimDetail,
   replaceRecipe,
   restoreDesignProfile,
-  withoutDescribedAttrs,
   type DesignDraft,
 } from './design-draft';
 import { useDescription } from './use-description';
@@ -96,11 +96,6 @@ export function DesignPage() {
     if (selectedTake) setProductionOpen(false);
   }, [selectedTake]);
   useEffect(() => {
-    // Free-form engines read the description itself; details mapped from it
-    // in tag mode would only repeat or contradict it (#2389).
-    if (freeform) setDraft(withoutDescribedAttrs);
-  }, [freeform, draft.describedAttrs]);
-  useEffect(() => {
     const timer = setTimeout(() => {
       try {
         localStorage.setItem(STORAGE, JSON.stringify(draft));
@@ -119,6 +114,7 @@ export function DesignPage() {
         current.attrs === draft.attrs
           ? changed.vdStates
           : applyVdState(current.attrs, category, value).vdStates,
+      describedAttrs: claimDetail(current.describedAttrs, category),
     }));
     if (changed.clearedCategory) {
       toast(
@@ -202,18 +198,7 @@ export function DesignPage() {
                   variant="ghost"
                   size="xs"
                   disabled={generation.isGenerating || mapper.pending}
-                  onClick={() => {
-                    if (!freeform) {
-                      mapper.reset(description);
-                      return;
-                    }
-                    mapper.cancel();
-                    setDraft((current) => ({
-                      ...current,
-                      attrs: mergeDescribedAttrs({}),
-                      describedAttrs: {},
-                    }));
-                  }}
+                  onClick={() => mapper.reset(description)}
                 >
                   <RotateCcwIcon />
                   {t('clone.reset_to_description')}
@@ -230,8 +215,9 @@ export function DesignPage() {
               onChange={(event) => {
                 const value = event.target.value;
                 setDraft((current) => ({ ...current, description: value }));
-                if (freeform) mapper.cancel();
-                else mapper.describe(event.target.value);
+                // Mapping runs for every engine so the details stay in step
+                // with the description when switching back to OmniVoice.
+                mapper.describe(value);
               }}
             />
             <p role="status" className="text-xs text-muted-foreground">
@@ -573,11 +559,7 @@ export function DesignPage() {
                   onClick={() =>
                     void generation.generateDesign({
                       text: draft.text,
-                      instruct: designInstruct(
-                        draft.attrs,
-                        description,
-                        generation.instructVocabulary,
-                      ),
+                      instruct: designInstruct(draft, generation.instructVocabulary),
                       seed: draft.seed,
                       profileId: profiles.data?.some(
                         (profile) => profile.id === draft.profileId && profile.kind === 'design',

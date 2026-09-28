@@ -4,10 +4,10 @@ import {
   designDraftFromTake,
   designInstruct,
   readDraft,
+  claimDetail,
   replaceRecipe,
   restoreDesignProfile,
   STORAGE,
-  withoutDescribedAttrs,
 } from './design-draft';
 
 const profile = {
@@ -58,17 +58,31 @@ describe('designed voice drafts', () => {
 describe('designInstruct', () => {
   const attrs = { Gender: 'female', Age: 'elderly' };
   const description = ' raspy old female, scottish accent ';
+  const draft = { attrs, description, describedAttrs: {} };
 
   it('sends OmniVoice only its tag set', () => {
-    expect(designInstruct(attrs, description, 'tags')).toBe('female, elderly');
+    expect(designInstruct(draft, 'tags')).toBe('female, elderly');
   });
 
   it('sends a free-form engine the description as written (#2389)', () => {
-    expect(designInstruct({}, description, 'freeform')).toBe('raspy old female, scottish accent');
-    expect(designInstruct(attrs, description, 'freeform')).toBe(
+    expect(designInstruct({ ...draft, attrs: {} }, 'freeform')).toBe(
+      'raspy old female, scottish accent',
+    );
+    expect(designInstruct(draft, 'freeform')).toBe(
       'raspy old female, scottish accent, female, elderly',
     );
-    expect(designInstruct(attrs, '  ', 'freeform')).toBe('female, elderly');
+    expect(designInstruct({ ...draft, description: '  ' }, 'freeform')).toBe('female, elderly');
+  });
+
+  it('keeps mapped details for OmniVoice but not for free-form engines', () => {
+    const mapped = { ...draft, describedAttrs: attrs };
+    expect(designInstruct(mapped, 'tags')).toBe('female, elderly');
+    expect(designInstruct(mapped, 'freeform')).toBe('raspy old female, scottish accent');
+  });
+
+  it('sends a picked detail even when it matches the mapped one', () => {
+    const picked = { ...draft, describedAttrs: claimDetail(attrs, 'Age') };
+    expect(designInstruct(picked, 'freeform')).toBe('raspy old female, scottish accent, elderly');
   });
 });
 
@@ -78,7 +92,7 @@ describe('free-form design drafts (#2389)', () => {
     text: 'Hello',
     mode: 'design',
     language: null,
-    instruct: 'raspy old female, scottish accent',
+    instruct: 'raspy, female',
     profile_id: null,
     audio_path: 'take.wav',
     duration_seconds: 1,
@@ -88,38 +102,29 @@ describe('free-form design drafts (#2389)', () => {
     created_at: 1,
   } satisfies HistoryItem;
 
-  it('restores a free-form take as its description instead of its tags', () => {
-    expect(designDraftFromTake(take)).toMatchObject({
-      description: 'raspy old female, scottish accent',
-      attrs: { Gender: 'Auto', Age: 'Auto' },
+  it('restores a free-form take as its description and keeps its tags', () => {
+    const draft = designDraftFromTake(take);
+    expect(draft).toMatchObject({
+      description: 'raspy, female',
+      attrs: { Gender: 'female', Age: 'Auto' },
+      describedAttrs: { Gender: 'female' },
     });
+    expect(designInstruct(draft, 'freeform')).toBe('raspy, female');
+    expect(designInstruct(draft, 'tags')).toBe('female');
     expect(designDraftFromTake({ ...take, instruct: 'female, elderly' })).toMatchObject({
       description: '',
       attrs: { Gender: 'female', Age: 'elderly' },
+      describedAttrs: {},
     });
   });
 
   it('drops the previous description when the recipe is replaced', () => {
-    const draft = { ...readDraft(), description: 'raspy', describedAttrs: { Gender: 'female' } };
-    expect(replaceRecipe(draft, { attrs: { Gender: 'male' } })).toMatchObject({
+    const current = { ...readDraft(), description: 'raspy', describedAttrs: { Gender: 'female' } };
+    expect(replaceRecipe(current, { attrs: { Gender: 'male' } })).toMatchObject({
       description: '',
       describedAttrs: {},
       attrs: { Gender: 'male' },
     });
-  });
-
-  it('keeps explicit picks and drops details mapped from the description', () => {
-    const draft = {
-      ...readDraft(),
-      attrs: { ...readDraft().attrs, Gender: 'female', Age: 'elderly', Pitch: 'low pitch' },
-      describedAttrs: { Gender: 'female', Age: 'elderly', Pitch: 'Auto' },
-    };
-    expect(withoutDescribedAttrs(draft)).toMatchObject({
-      attrs: { Gender: 'Auto', Age: 'Auto', Pitch: 'low pitch' },
-      describedAttrs: {},
-    });
-    const clean = { ...draft, describedAttrs: {} };
-    expect(withoutDescribedAttrs(clean)).toBe(clean);
   });
 
   it('reads drafts saved before descriptions were persisted', () => {
