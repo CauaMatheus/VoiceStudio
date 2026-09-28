@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { HistoryItem, Profile } from '@/lib/api/types';
 import {
+  applyDescription,
   designDraftFromTake,
   designInstruct,
+  pickDetail,
   readDraft,
-  claimDetail,
   replaceRecipe,
   restoreDesignProfile,
   STORAGE,
@@ -58,35 +59,35 @@ describe('designed voice drafts', () => {
 describe('designInstruct', () => {
   const attrs = { Gender: 'female', Age: 'elderly' };
   const description = ' raspy old female, scottish accent ';
-  const draft = { attrs, description, describedAttrs: {} };
+  const draft = { attrs, description, picks: {} };
+  const pick = (value: string) => ({ value, description: '' });
 
-  it('sends OmniVoice only its tag set', () => {
+  it('sends OmniVoice its effective details', () => {
     expect(designInstruct(draft, 'tags')).toBe('female, elderly');
   });
 
-  it('sends a free-form engine the description as written (#2389)', () => {
-    expect(designInstruct({ ...draft, attrs: {} }, 'freeform')).toBe(
-      'raspy old female, scottish accent',
+  it('sends a free-form engine the description as written plus its picks (#2389)', () => {
+    expect(designInstruct(draft, 'freeform')).toBe('raspy old female, scottish accent');
+    expect(designInstruct({ ...draft, picks: { Age: pick('elderly') } }, 'freeform')).toBe(
+      'raspy old female, scottish accent, elderly',
     );
-    expect(designInstruct(draft, 'freeform')).toBe(
-      'raspy old female, scottish accent, female, elderly',
-    );
-    expect(designInstruct({ ...draft, description: '  ' }, 'freeform')).toBe('female, elderly');
-  });
-
-  it('keeps mapped details for OmniVoice but not for free-form engines', () => {
-    const mapped = { ...draft, describedAttrs: attrs };
-    expect(designInstruct(mapped, 'tags')).toBe('female, elderly');
-    expect(designInstruct(mapped, 'freeform')).toBe('raspy old female, scottish accent');
-  });
-
-  it('sends a picked detail even when it matches the mapped one', () => {
-    const picked = { ...draft, describedAttrs: claimDetail(attrs, 'Age') };
-    expect(designInstruct(picked, 'freeform')).toBe('raspy old female, scottish accent, elderly');
+    expect(
+      designInstruct(
+        { ...draft, description: '  ', picks: { Gender: pick('female'), Age: pick('elderly') } },
+        'freeform',
+      ),
+    ).toBe('female, elderly');
   });
 });
 
 describe('free-form design drafts (#2389)', () => {
+  // Sichuanese, written as an escape to keep the source ASCII.
+  const DIALECT = '\u56DB\u5DDD\u8BDD';
+  const blank = () => ({ ...readDraft(), description: '', picks: {}, mapped: {} });
+  const typed = (draft: ReturnType<typeof blank>, description: string) => ({
+    ...draft,
+    description,
+  });
   const take = {
     id: 'take',
     text: 'Hello',
@@ -102,33 +103,108 @@ describe('free-form design drafts (#2389)', () => {
     created_at: 1,
   } satisfies HistoryItem;
 
-  it('restores a free-form take as its description and keeps its tags', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('keeps a pick when an edit says nothing new about it', () => {
+    const mapped = applyDescription(
+      typed(blank(), 'old man'),
+      { Gender: 'male', Age: 'elderly' },
+      'old man',
+    );
+    const picked = pickDetail(mapped, 'Age', 'middle-aged').draft;
+    const edited = typed(picked, 'old man, raspy');
+    const remapped = applyDescription(edited, { Gender: 'male', Age: 'elderly' }, 'old man, raspy');
+    expect(remapped.attrs).toMatchObject({ Gender: 'male', Age: 'middle-aged' });
+    expect(designInstruct(remapped, 'freeform')).toBe('old man, raspy, middle-aged');
+    expect(designInstruct(remapped, 'tags')).toBe('male, middle-aged');
+  });
+
+  it('keeps a pick that matches the mapped value', () => {
+    const mapped = applyDescription(typed(blank(), 'raspy'), { Age: 'elderly' }, 'raspy');
+    const picked = pickDetail(mapped, 'Age', 'elderly').draft;
+    expect(designInstruct(picked, 'freeform')).toBe('raspy, elderly');
+  });
+
+  it('lets a newer description override an older pick of the same detail', () => {
+    const recipe = replaceRecipe(blank(), {
+      attrs: { ...blank().attrs, Gender: 'male', Pitch: 'low pitch' },
+    });
+    const edited = typed(recipe, 'young woman');
+    const remapped = applyDescription(
+      edited,
+      { Gender: 'female', Age: 'young adult' },
+      'young woman',
+    );
+    expect(remapped.attrs).toMatchObject({
+      Gender: 'female',
+      Age: 'young adult',
+      Pitch: 'low pitch',
+    });
+    expect(designInstruct(remapped, 'freeform')).toBe('young woman, low pitch');
+  });
+
+  it('does not let a late mapping undo a pick made after the text was typed', () => {
+    const picked = pickDetail(typed(blank(), 'a child'), 'Age', 'elderly').draft;
+    const landed = applyDescription(picked, { Age: 'child' }, 'a child');
+    expect(landed.attrs.Age).toBe('elderly');
+    const edited = typed(landed, 'a child, raspy');
+    expect(applyDescription(edited, { Age: 'child' }, 'a child, raspy').attrs.Age).toBe('elderly');
+  });
+
+  it('lets a newer description override an older exclusive pick', () => {
+    const accent = pickDetail(blank(), 'EnglishAccent', 'british accent').draft;
+    const edited = typed(accent, 'from Sichuan');
+    const remapped = applyDescription(edited, { ChineseDialect: DIALECT }, 'from Sichuan');
+    expect(remapped.attrs).toMatchObject({ ChineseDialect: DIALECT, EnglishAccent: 'Auto' });
+    expect(remapped.picks).not.toHaveProperty('EnglishAccent');
+  });
+
+  it('drops the pick an exclusive pick clears', () => {
+    const accent = pickDetail(blank(), 'EnglishAccent', 'british accent').draft;
+    const dialect = pickDetail(accent, 'ChineseDialect', DIALECT);
+    expect(dialect.clearedCategory).toBe('EnglishAccent');
+    expect(dialect.draft.picks).not.toHaveProperty('EnglishAccent');
+  });
+
+  it('restores a take so both engine kinds receive the same instruct', () => {
     const draft = designDraftFromTake(take);
     expect(draft).toMatchObject({
       description: 'raspy, female',
       attrs: { Gender: 'female', Age: 'Auto' },
-      describedAttrs: { Gender: 'female' },
+      picks: {},
     });
     expect(designInstruct(draft, 'freeform')).toBe('raspy, female');
     expect(designInstruct(draft, 'tags')).toBe('female');
-    expect(designDraftFromTake({ ...take, instruct: 'female, elderly' })).toMatchObject({
-      description: '',
-      attrs: { Gender: 'female', Age: 'elderly' },
-      describedAttrs: {},
-    });
+    const tagsOnly = designDraftFromTake({ ...take, instruct: 'female, elderly' });
+    expect(tagsOnly.description).toBe('female, elderly');
+    expect(designInstruct(tagsOnly, 'freeform')).toBe('female, elderly');
+    expect(designInstruct(tagsOnly, 'tags')).toBe('female, elderly');
   });
 
-  it('drops the previous description when the recipe is replaced', () => {
-    const current = { ...readDraft(), description: 'raspy', describedAttrs: { Gender: 'female' } };
-    expect(replaceRecipe(current, { attrs: { Gender: 'male' } })).toMatchObject({
+  it('replaces the description and makes the recipe the picks', () => {
+    const current = {
+      ...blank(),
+      description: 'raspy',
+      picks: { Pitch: { value: 'low pitch', description: 'raspy' } },
+    };
+    const replaced = replaceRecipe(current, { attrs: { ...current.attrs, Gender: 'male' } });
+    expect(replaced).toMatchObject({
       description: '',
-      describedAttrs: {},
-      attrs: { Gender: 'male' },
+      picks: { Gender: { value: 'male', description: '' } },
+      mapped: {},
     });
+    expect(designInstruct(replaced, 'freeform')).toBe('male');
   });
 
-  it('reads drafts saved before descriptions were persisted', () => {
-    localStorage.setItem(STORAGE, JSON.stringify({ text: 'Hi', describedAttrs: ['bad'] }));
-    expect(readDraft()).toMatchObject({ description: '', describedAttrs: {} });
+  it('treats details in drafts saved before descriptions as picks', () => {
+    localStorage.setItem(STORAGE, JSON.stringify({ text: 'Hi', attrs: { Gender: 'female' } }));
+    const legacy = readDraft();
+    expect(legacy).toMatchObject({
+      description: '',
+      picks: { Gender: { value: 'female', description: '' } },
+    });
+    expect(designInstruct(legacy, 'freeform')).toBe('female');
+    localStorage.setItem(STORAGE, JSON.stringify({ picks: { Age: 'elderly' }, mapped: [1] }));
+    expect(readDraft()).toMatchObject({ picks: {}, mapped: {} });
   });
 });
