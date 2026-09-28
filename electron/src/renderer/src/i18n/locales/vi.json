@@ -426,6 +426,7 @@
     "describe_hint": "Mô tả giọng nói, hoặc chọn một điểm khởi đầu. Cả hai cách đều tự điền chi tiết bên dưới.",
     "describe_unmatched": "Không thể ánh xạ: {{items}}",
     "describe_no_match": "Chưa nhận ra đặc điểm giọng nói nào — hãy thử các từ như deep, elderly hoặc British.",
+    "describe_freeform": "Công cụ này đọc mô tả của bạn đúng như bạn viết. Các chi tiết bên dưới là gợi ý bổ sung tùy chọn.",
     "define_by_design": "Theo thiết kế",
     "define_from_audio": "Từ âm thanh",
     "define_voice": "Xác định giọng nói",

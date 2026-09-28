@@ -428,6 +428,7 @@
     "describe_hint": "Descreva a voz, ou escolha um ponto de partida. Qualquer um dos dois preenche os detalhes abaixo.",
     "describe_unmatched": "Não foi possível mapear: {{items}}",
     "describe_no_match": "Ainda não foram reconhecidos traços de voz — experimente palavras como deep, elderly ou British.",
+    "describe_freeform": "Este mecanismo lê sua descrição exatamente como foi escrita. Os detalhes abaixo são dicas extras opcionais.",
     "define_by_design": "Por design",
     "define_from_audio": "A partir de áudio",
     "define_voice": "Definir voz",

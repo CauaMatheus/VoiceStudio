@@ -430,6 +430,7 @@
     "describe_hint": "Opisz głos albo wybierz punkt wyjścia. Każde z tych działań wypełni szczegóły poniżej.",
     "describe_unmatched": "Nie udało się dopasować: {{items}}",
     "describe_no_match": "Nie rozpoznano jeszcze cech głosu — spróbuj słów takich jak deep, elderly lub British.",
+    "describe_freeform": "Ten silnik odczytuje opis dokładnie tak, jak go napisano. Szczegóły poniżej to opcjonalne dodatkowe wskazówki.",
     "define_by_design": "Według projektu",
     "define_from_audio": "Z audio",
     "define_voice": "Zdefiniuj głos",

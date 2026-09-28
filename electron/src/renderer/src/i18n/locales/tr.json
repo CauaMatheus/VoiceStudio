@@ -426,6 +426,7 @@
     "describe_hint": "Sesi tanımlayın veya bir başlangıç noktası seçin. Her ikisi de aşağıdaki ayrıntıları doldurur.",
     "describe_unmatched": "Eşlenemedi: {{items}}",
     "describe_no_match": "Henüz ses özelliği tanınmadı — deep, elderly veya British gibi kelimeler deneyin.",
+    "describe_freeform": "Bu motor açıklamanızı yazdığınız gibi okur. Aşağıdaki ayrıntılar isteğe bağlı ek ipuçlarıdır.",
     "define_by_design": "Tasarımla",
     "define_from_audio": "Sesten",
     "define_voice": "Sesi tanımla",

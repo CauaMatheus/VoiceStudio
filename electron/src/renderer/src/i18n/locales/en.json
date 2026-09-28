@@ -357,6 +357,7 @@
     "describe_hint": "Describe the voice, or pick a starting point. Either one fills in the details below.",
     "describe_unmatched": "Couldn't map: {{items}}",
     "describe_no_match": "No voice traits recognized yet — try words like deep, elderly, or British.",
+    "describe_freeform": "This engine reads your description as written. Details below are optional extra cues.",
     "auto_kicker": "· auto",
     "cat_Gender": "Gender",
     "cat_Age": "Age",

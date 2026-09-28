@@ -426,6 +426,7 @@
     "describe_hint": "描述這個聲音，或選擇一個起點——兩者都會自動填好下方的詳情。",
     "describe_unmatched": "無法辨識：{{items}}",
     "describe_no_match": "尚未辨識出聲音特徵——試試 deep、elderly 或 British 等詞。",
+    "describe_freeform": "此引擎會按原樣讀取你的描述。下方細節為可選的補充提示。",
     "define_by_design": "以設計",
     "define_from_audio": "從音訊",
     "define_voice": "定義聲音",

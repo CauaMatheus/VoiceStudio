@@ -426,6 +426,7 @@
     "describe_hint": "Beschrijf de stem, of kies een startpunt. Beide vullen de details hieronder in.",
     "describe_unmatched": "Kon niet toewijzen: {{items}}",
     "describe_no_match": "Nog geen stemkenmerken herkend — probeer woorden als deep, elderly of British.",
+    "describe_freeform": "Deze engine leest je beschrijving letterlijk. De details hieronder zijn optionele extra aanwijzingen.",
     "define_by_design": "Via ontwerp",
     "define_from_audio": "Vanuit audio",
     "define_voice": "Stem definiëren",

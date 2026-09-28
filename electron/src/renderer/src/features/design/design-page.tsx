@@ -12,6 +12,7 @@ import { openTake, useSelectedTake } from '@/lib/store/takes';
 import {
   DESIGN_DRAFT_EVENT,
   STORAGE,
+  designInstruct,
   readDraft,
   restoreDesignProfile,
   type DesignDraft,
@@ -157,6 +158,7 @@ export function DesignPage() {
     : t('clone.synthesize');
   const generationProgress =
     generation.stage === 'loading' ? generation.modelProgress : generation.progress;
+  const freeform = generation.instructVocabulary === 'freeform';
   const identityRecipe =
     Object.values(draft.attrs)
       .filter((value) => value && value !== 'Auto')
@@ -190,7 +192,14 @@ export function DesignPage() {
                   variant="ghost"
                   size="xs"
                   disabled={generation.isGenerating || mapper.pending}
-                  onClick={() => mapper.reset(description)}
+                  onClick={() => {
+                    if (!freeform) {
+                      mapper.reset(description);
+                      return;
+                    }
+                    mapper.cancel();
+                    setDraft((current) => ({ ...current, attrs: mergeDescribedAttrs({}) }));
+                  }}
                 >
                   <RotateCcwIcon />
                   {t('clone.reset_to_description')}
@@ -206,21 +215,24 @@ export function DesignPage() {
               placeholder={t('clone.describe_placeholder')}
               onChange={(event) => {
                 setDescription(event.target.value);
-                mapper.describe(event.target.value);
+                if (freeform) mapper.cancel();
+                else mapper.describe(event.target.value);
               }}
             />
             <p role="status" className="text-xs text-muted-foreground">
-              {mapper.pending
-                ? t('preferences.loading')
-                : !mapper.matched
-                  ? t('clone.describe_no_match')
-                  : mapper.unmatched.length
-                    ? t('clone.describe_unmatched', {
-                        items: mapper.unmatched.join(', '),
-                      })
-                    : t('clone.describe_hint')}
+              {freeform
+                ? t('clone.describe_freeform')
+                : mapper.pending
+                  ? t('preferences.loading')
+                  : !mapper.matched
+                    ? t('clone.describe_no_match')
+                    : mapper.unmatched.length
+                      ? t('clone.describe_unmatched', {
+                          items: mapper.unmatched.join(', '),
+                        })
+                      : t('clone.describe_hint')}
             </p>
-            {mapper.failed && (
+            {!freeform && mapper.failed && (
               <Button variant="ghost" size="xs" onClick={() => mapper.describe(description)}>
                 {t('backend.retry')}
               </Button>
@@ -546,7 +558,11 @@ export function DesignPage() {
                   onClick={() =>
                     void generation.generateDesign({
                       text: draft.text,
-                      instruct: buildDesignInstruct(draft.attrs, '').instruct,
+                      instruct: designInstruct(
+                        draft.attrs,
+                        description,
+                        generation.instructVocabulary,
+                      ),
                       seed: draft.seed,
                       profileId: profiles.data?.some(
                         (profile) => profile.id === draft.profileId && profile.kind === 'design',

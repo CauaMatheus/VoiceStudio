@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Profile } from '@/lib/api/types';
-import { readDraft, restoreDesignProfile, STORAGE } from './design-draft';
+import { designInstruct, readDraft, restoreDesignProfile, STORAGE } from './design-draft';
 
 const profile = {
   id: 'designed-voice',
@@ -44,5 +44,22 @@ describe('designed voice drafts', () => {
       seed: 9,
       attrs: { Gender: 'female', Pitch: 'low pitch' },
     });
+  });
+});
+
+describe('designInstruct', () => {
+  const attrs = { Gender: 'female', Age: 'elderly' };
+  const description = ' raspy old female, scottish accent ';
+
+  it('sends OmniVoice only its tag set', () => {
+    expect(designInstruct(attrs, description, 'tags')).toBe('female, elderly');
+  });
+
+  it('sends a free-form engine the description as written (#2389)', () => {
+    expect(designInstruct({}, description, 'freeform')).toBe('raspy old female, scottish accent');
+    expect(designInstruct(attrs, description, 'freeform')).toBe(
+      'raspy old female, scottish accent, female, elderly',
+    );
+    expect(designInstruct(attrs, '  ', 'freeform')).toBe('female, elderly');
   });
 });

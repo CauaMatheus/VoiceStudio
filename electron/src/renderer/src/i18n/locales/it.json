@@ -428,6 +428,7 @@
     "describe_hint": "Descrivi la voce, oppure scegli un punto di partenza. In entrambi i casi i dettagli qui sotto si compilano automaticamente.",
     "describe_unmatched": "Impossibile mappare: {{items}}",
     "describe_no_match": "Nessun tratto vocale riconosciuto — prova parole come deep, elderly o British.",
+    "describe_freeform": "Questo motore legge la tua descrizione così com'è. I dettagli qui sotto sono indicazioni extra facoltative.",
     "define_by_design": "Tramite progettazione",
     "define_from_audio": "Da audio",
     "define_voice": "Definisci la voce",

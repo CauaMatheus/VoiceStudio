@@ -426,6 +426,7 @@
     "describe_hint": "Deskripsikan suaranya, atau pilih titik awal. Keduanya akan mengisi detail di bawah.",
     "describe_unmatched": "Tidak dapat dipetakan: {{items}}",
     "describe_no_match": "Belum ada ciri suara yang dikenali — coba kata seperti deep, elderly, atau British.",
+    "describe_freeform": "Mesin ini membaca deskripsi Anda apa adanya. Detail di bawah adalah petunjuk tambahan opsional.",
     "define_by_design": "Lewat desain",
     "define_from_audio": "Dari audio",
     "define_voice": "Tentukan suara",

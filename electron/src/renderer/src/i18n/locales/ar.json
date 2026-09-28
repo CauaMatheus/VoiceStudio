@@ -434,6 +434,7 @@
     "describe_hint": "صِف الصوت، أو اختر نقطة بداية. أيٌّ منهما يملأ التفاصيل أدناه.",
     "describe_unmatched": "تعذّر التعيين: {{items}}",
     "describe_no_match": "لم يتم التعرف على سمات صوتية بعد — جرّب كلمات مثل deep أو elderly أو British.",
+    "describe_freeform": "يقرأ هذا المحرك وصفك كما كتبته. التفاصيل أدناه إشارات إضافية اختيارية.",
     "define_by_design": "بالتصميم",
     "define_from_audio": "من الصوت",
     "define_voice": "تحديد الصوت",

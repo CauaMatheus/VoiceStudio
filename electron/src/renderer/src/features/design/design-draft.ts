@@ -1,5 +1,6 @@
-import type { HistoryItem, Profile } from '@/lib/api/types';
+import type { HistoryItem, InstructVocabulary, Profile } from '@/lib/api/types';
 import {
+  buildDesignInstruct,
   instructToVdStates,
   mergeDescribedAttrs,
 } from '@shared/utils/voiceInstruct';
@@ -40,6 +41,21 @@ export function writeDraft(draft: DesignDraft) {
     /* The mounted workspace can still receive the in-memory draft. */
   }
   window.dispatchEvent(new CustomEvent<DesignDraft>(DESIGN_DRAFT_EVENT, { detail: draft }));
+}
+
+/**
+ * The instruct a design take sends. OmniVoice only accepts its tag set, so the
+ * picked details are all it gets; free-form engines read the description as
+ * written, with any picked details appended as extra cues (#2389).
+ */
+export function designInstruct(
+  attrs: Record<string, string>,
+  description: string,
+  vocabulary: InstructVocabulary,
+): string {
+  const tags = buildDesignInstruct(attrs, '').instruct;
+  if (vocabulary !== 'freeform') return tags;
+  return [description.trim(), tags].filter(Boolean).join(', ');
 }
 
 /** Rebuild the Voice Design workspace from a generation-history recipe. */
