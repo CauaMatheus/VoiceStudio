@@ -14,6 +14,7 @@ import {
   STORAGE,
   applyDescription,
   designInstruct,
+  designRecipe,
   pickDetail,
   readDraft,
   replaceRecipe,
@@ -562,6 +563,7 @@ export function DesignPage() {
                     void generation.generateDesign({
                       text: draft.text,
                       instruct: designInstruct(draft, generation.instructVocabulary),
+                      recipe: designRecipe(draft),
                       seed: draft.seed,
                       profileId: profiles.data?.some(
                         (profile) => profile.id === draft.profileId && profile.kind === 'design',

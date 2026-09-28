@@ -4,6 +4,7 @@ import {
   applyDescription,
   designDraftFromTake,
   designInstruct,
+  designRecipe,
   pickDetail,
   readDraft,
   replaceRecipe,
@@ -179,6 +180,45 @@ describe('free-form design drafts (#2389)', () => {
     expect(tagsOnly.description).toBe('female, elderly');
     expect(designInstruct(tagsOnly, 'freeform')).toBe('female, elderly');
     expect(designInstruct(tagsOnly, 'tags')).toBe('female, elderly');
+  });
+
+  it('reopens a take with a stored recipe exactly as it was drafted', () => {
+    const mapped = applyDescription(
+      typed(blank(), 'raspy old woman'),
+      { Gender: 'female', Age: 'elderly' },
+      'raspy old woman',
+    );
+    const drafted = pickDetail(mapped, 'Pitch', 'low pitch').draft;
+    const reopened = designDraftFromTake({
+      ...take,
+      instruct: designInstruct(drafted, 'freeform'),
+      design_recipe: JSON.stringify(designRecipe(drafted)),
+    });
+    expect(reopened).toMatchObject({
+      description: 'raspy old woman',
+      attrs: { Gender: 'female', Age: 'elderly', Pitch: 'low pitch' },
+      picks: { Pitch: { value: 'low pitch', description: 'raspy old woman' } },
+      mapped: { Gender: 'female', Age: 'elderly', Pitch: 'Auto' },
+    });
+    for (const vocabulary of ['freeform', 'tags'] as const) {
+      expect(designInstruct(reopened, vocabulary)).toBe(designInstruct(drafted, vocabulary));
+    }
+    // Editing the reopened description keeps the pick it was made with.
+    const edited = typed(reopened, 'raspy old woman, tired');
+    expect(
+      applyDescription(edited, { Gender: 'female', Age: 'elderly' }, 'raspy old woman, tired').attrs
+        .Pitch,
+    ).toBe('low pitch');
+  });
+
+  it('falls back to the instruct when a stored recipe is unreadable', () => {
+    for (const design_recipe of ['{broken', '[]', JSON.stringify({ picks: {} }), null]) {
+      expect(designDraftFromTake({ ...take, design_recipe })).toMatchObject({
+        description: 'raspy, female',
+        attrs: { Gender: 'female' },
+        picks: {},
+      });
+    }
   });
 
   it('replaces the description and makes the recipe the picks', () => {

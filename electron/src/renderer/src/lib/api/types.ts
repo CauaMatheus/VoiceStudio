@@ -46,6 +46,8 @@ export interface HistoryItem {
   generation_time: number | null;
   seed: number | null;
   starred: boolean | number | null;
+  /** JSON `DesignRecipe` for Voice Design takes; null for other takes and older rows (#2389). */
+  design_recipe?: string | null;
   /** Epoch seconds (SQLite REAL) on the wire; tolerate ISO strings too. */
   created_at: number | string;
 }
@@ -124,6 +126,13 @@ export interface SystemInfo {
 
 export type InstructVocabulary = 'tags' | 'freeform';
 
+/** The Voice Design draft behind a take, stored with it so reopening rebuilds it. */
+export interface DesignRecipe {
+  description: string;
+  picks: Record<string, string>;
+  mapped: Record<string, string>;
+}
+
 // ── Generation (`POST /generate`, classic whole-file path) ─────────────────
 /** Everything the clone form sends. Names are the UI names; `toGenerateForm`
  *  in generate.ts maps them to the multipart field names. */
@@ -141,6 +150,8 @@ export interface CloneGenerateInput {
   instruct?: string;
   /** How the target engine reads `instruct`; absent means the OmniVoice tag set. */
   instructVocabulary?: InstructVocabulary;
+  /** Voice Design draft stored with the take; never affects synthesis. */
+  designRecipe?: DesignRecipe;
   steps: number;
   cfg: number;
   speed: number;

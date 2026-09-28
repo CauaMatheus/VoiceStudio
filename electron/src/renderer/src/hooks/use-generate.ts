@@ -19,7 +19,7 @@ import { throttle } from '@tanstack/react-pacer';
 import { toast } from 'sonner';
 import { ApiError, apiJson, describeError, isAbortError } from '@/lib/api/client';
 import { generateClone, sanitizeInstruct } from '@/lib/api/generate';
-import type { GenerateResult, InstructVocabulary } from '@/lib/api/types';
+import type { DesignRecipe, GenerateResult, InstructVocabulary } from '@/lib/api/types';
 import { tr } from '@/lib/i18n-text';
 import { queryKeys } from '@/lib/query';
 import { cloneSettingsStore } from '@/lib/store/clone-settings';
@@ -50,6 +50,8 @@ export interface DesignGenerateInput {
   seed: number;
   language?: string;
   profileId?: string | null;
+  /** Stored with the take so reopening it rebuilds the same draft (#2389). */
+  recipe?: DesignRecipe;
 }
 
 export interface UseGenerateClone {
@@ -277,6 +279,7 @@ function useGenerateController(): UseGenerateClone {
           refText: design ? undefined : settings.refText,
           instruct,
           instructVocabulary,
+          designRecipe: design?.recipe,
           steps: settings.steps,
           cfg: settings.cfg,
           speed: settings.speed,

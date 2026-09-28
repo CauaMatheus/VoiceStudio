@@ -1,4 +1,4 @@
-import type { HistoryItem, InstructVocabulary, Profile } from '@/lib/api/types';
+import type { DesignRecipe, HistoryItem, InstructVocabulary, Profile } from '@/lib/api/types';
 import {
   applyVdState,
   buildDesignInstruct,
@@ -164,25 +164,59 @@ export function designInstruct(
   return [draft.description.trim(), tags].filter(Boolean).join(', ');
 }
 
+/** The part of the draft stored with a take so reopening it rebuilds the draft (#2389). */
+export function designRecipe(draft: DesignDraft): DesignRecipe {
+  return {
+    description: draft.description.trim(),
+    picks: Object.fromEntries(
+      Object.entries(draft.picks).map(([category, pick]) => [category, pick.value]),
+    ),
+    mapped: draft.mapped,
+  };
+}
+
+function parseRecipe(raw: string | null | undefined): DesignRecipe | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== 'object' || typeof value.description !== 'string') return null;
+    return {
+      description: value.description,
+      picks: stringRecord(value.picks),
+      mapped: stringRecord(value.mapped),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Rebuild the Voice Design workspace from a generation-history recipe. The
- * saved instruct comes back as the description, so a free-form engine
- * receives it unchanged, and its recognised tags as details, so OmniVoice
- * does too. History keeps only the combined instruct, so which of its tags
- * were picks is not recoverable.
+ * Rebuild the Voice Design workspace from a generation-history take. A take
+ * with a stored recipe comes back exactly as it was drafted. An older take
+ * only has its combined instruct: it returns as the description, so a
+ * free-form engine receives it unchanged, with its recognised tags as
+ * details, so OmniVoice does too.
  */
 export function designDraftFromTake(item: HistoryItem): DesignDraft {
-  const description = item.instruct ?? '';
-  const mapped = mergeDescribedAttrs(instructToVdStates(description));
-  return {
+  const recipe = parseRecipe(item.design_recipe);
+  const description = recipe?.description ?? item.instruct ?? '';
+  const mapped = mergeDescribedAttrs(recipe?.mapped ?? instructToVdStates(description));
+  const draft: DesignDraft = {
     text: item.text,
     attrs: mapped,
     seed: item.seed ?? pickDesignSeed(false, null),
     profileId: item.profile_id,
     description,
-    picks: {},
+    picks: Object.fromEntries(
+      Object.entries(recipe?.picks ?? {}).map(([category, value]) => [
+        category,
+        { value, description },
+      ]),
+    ),
     mapped,
   };
+  // The picks were made with this description, so they layer over its mapping.
+  return applyDescription(draft, mapped, description);
 }
 
 /** Restore a saved design recipe without leaking values from the previous voice. */

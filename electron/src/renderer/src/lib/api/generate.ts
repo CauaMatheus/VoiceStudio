@@ -166,6 +166,7 @@ export function toGenerateForm(input: CloneGenerateInput): FormData {
         : sanitizeInstruct(input.instruct).instruct;
     if (instruct) form.append('instruct', instruct);
   }
+  if (input.designRecipe) form.append('design_recipe', JSON.stringify(input.designRecipe));
   return form;
 }
 
