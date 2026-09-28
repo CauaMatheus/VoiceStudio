@@ -136,10 +136,14 @@ description as free text — Qwen3-TTS VoiceDesign (MLX-Audio), VoxCPM2 and
 audio.cpp — receive the Voice Design description exactly as you typed it, so
 traits outside the list (such as "Scottish accent" or "raspy") reach the model.
 Any details you pick in the app are appended as extra cues; details the app
-mapped from your description in OmniVoice mode are not re-sent. Reopening a
-take restores its description, and choosing a saved voice or a starting point
-replaces it. The engine catalogue reports this as `instruct_vocabulary`:
-`"tags"` for the OmniVoice family, `"freeform"` for everything else.
+mapped from your description are not re-sent. The engine catalogue reports
+this as `instruct_vocabulary`: `"tags"` for the OmniVoice family,
+`"freeform"` for everything else.
+
+On every engine, a detail you pick holds until your description says something
+different about it, and **Reset to description** drops all picks. Reopening a
+take restores its instruction as the description, and choosing a saved voice
+or a starting point replaces the description.
 
 Gallery previews reject silent output and near-pure tonal buzz. The quality
 check measures short audio frames rather than the whole clip, so longer or
