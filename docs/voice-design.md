@@ -141,9 +141,13 @@ this as `instruct_vocabulary`: `"tags"` for the OmniVoice family,
 `"freeform"` for everything else.
 
 On every engine, a detail you pick holds until your description says something
-different about it, and **Reset to description** drops all picks. Reopening a
-take restores its instruction as the description, and choosing a saved voice
-or a starting point replaces the description.
+different about it, and **Reset to description** drops all picks. Choosing a
+saved voice or a starting point replaces the description.
+
+Reopening a take restores the description, picks and details it was made with;
+they are kept with the take in your local history. Takes made before this was
+recorded come back with their full instruction as the description, so they
+still render the same.
 
 Gallery previews reject silent output and near-pure tonal buzz. The quality
 check measures short audio frames rather than the whole clip, so longer or
