@@ -135,9 +135,11 @@ The attribute list above is OmniVoice's vocabulary. Engines that read a
 description as free text — Qwen3-TTS VoiceDesign (MLX-Audio), VoxCPM2 and
 audio.cpp — receive the Voice Design description exactly as you typed it, so
 traits outside the list (such as "Scottish accent" or "raspy") reach the model.
-Any details you pick in the app are appended as extra cues. The engine
-catalogue reports this as `instruct_vocabulary`: `"tags"` for the OmniVoice
-family, `"freeform"` for everything else.
+Any details you pick in the app are appended as extra cues; details the app
+mapped from your description in OmniVoice mode are not re-sent. Reopening a
+take restores its description, and choosing a saved voice or a starting point
+replaces it. The engine catalogue reports this as `instruct_vocabulary`:
+`"tags"` for the OmniVoice family, `"freeform"` for everything else.
 
 Gallery previews reject silent output and near-pure tonal buzz. The quality
 check measures short audio frames rather than the whole clip, so longer or
