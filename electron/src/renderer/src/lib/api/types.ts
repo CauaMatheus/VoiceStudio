@@ -66,6 +66,8 @@ export interface EngineBackend {
   reason: string | null;
   hint?: string | null;
   supports_cloning?: boolean | null;
+  /** "tags" = OmniVoice's closed design vocabulary; "freeform" = sent as written (#2389). */
+  instruct_vocabulary?: InstructVocabulary;
   /** Seconds of a clone reference the engine uses; null when not verified (#2281). */
   max_ref_seconds?: number | null;
   /** How that stretch is chosen from a longer clip. */
@@ -120,6 +122,8 @@ export interface SystemInfo {
   ffmpeg_path?: string;
 }
 
+export type InstructVocabulary = 'tags' | 'freeform';
+
 // ── Generation (`POST /generate`, classic whole-file path) ─────────────────
 /** Everything the clone form sends. Names are the UI names; `toGenerateForm`
  *  in generate.ts maps them to the multipart field names. */
@@ -133,8 +137,10 @@ export interface CloneGenerateInput {
   refAudio?: File | Blob | null;
   refAudioName?: string;
   refText?: string;
-  /** Free-text style; sanitised through the instruct whitelist before sending. */
+  /** Free-text style; sanitised through the instruct whitelist unless the engine is "freeform". */
   instruct?: string;
+  /** How the target engine reads `instruct`; absent means the OmniVoice tag set. */
+  instructVocabulary?: InstructVocabulary;
   steps: number;
   cfg: number;
   speed: number;

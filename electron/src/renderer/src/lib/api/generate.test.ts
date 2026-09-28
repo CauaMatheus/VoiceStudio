@@ -148,6 +148,17 @@ describe('toGenerateForm', () => {
       toGenerateForm({ ...BASE_INPUT, profileId: 'p1', instruct: 'just prose' }).has('instruct'),
     ).toBe(false);
   });
+
+  it('sends a free-form engine its description as written (#2389)', () => {
+    const description = ' raspy old female, scottish accent ';
+    expect(
+      toGenerateForm({
+        ...BASE_INPUT,
+        instruct: description,
+        instructVocabulary: 'freeform',
+      }).get('instruct'),
+    ).toBe('raspy old female, scottish accent');
+  });
 });
 
 describe('parseGenerateHeaders', () => {

@@ -160,7 +160,10 @@ export function toGenerateForm(input: CloneGenerateInput): FormData {
   }
 
   if (input.instruct) {
-    const { instruct } = sanitizeInstruct(input.instruct);
+    const instruct =
+      input.instructVocabulary === 'freeform'
+        ? input.instruct.trim()
+        : sanitizeInstruct(input.instruct).instruct;
     if (instruct) form.append('instruct', instruct);
   }
   return form;
